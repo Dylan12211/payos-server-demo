@@ -52,7 +52,7 @@ router.post("/create", async (req, res) => {
 // Lấy thông tin order
 router.get("/:orderId", async (req, res) => {
   try {
-    const order = await payOS.getPaymentLinkInfomation(req.params.orderId);
+    const order = await payOS.getPaymentLinkInformation(req.params.orderId);
     if (!order) {
       return res.status(404).json({
         error: -1,
