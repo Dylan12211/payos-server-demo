@@ -1,28 +1,44 @@
-const express = require("express");
+const express = require('express');
 const router = express.Router();
-const payOS = require("../utils/payos");
+const axios = require('axios');
 
-router.post("/payos", async function (req, res) {
-  console.log("payment handler");
-  const webhookData = payOS.verifyPaymentWebhookData(req.body);
+const PAYOS_CLIENT_ID = process.env.PAYOS_CLIENT_ID;
+const PAYOS_API_KEY = process.env.PAYOS_API_KEY;
+const PAYOS_ENDPOINT = process.env.PAYOS_ENDPOINT || 'https://api-merchant.payos.vn';
 
-  if (
-    ["Ma giao dich thu nghiem", "VQRIO123"].includes(webhookData.description)
-  ) {
-    return res.json({
-      error: 0,
-      message: "Ok",
-      data: webhookData
-    });
-  }
+router.get('/:id', async (req, res) => {
+    try {
+        const paymentRequestId = req.params.id;
 
-  // Source code uses webhook data
+        const response = await axios.get(`${PAYOS_ENDPOINT}/v2/payment-requests/${paymentRequestId}`, {
+            headers: {
+                'x-client-id': PAYOS_CLIENT_ID,
+                'x-api-key': PAYOS_API_KEY,
+                'Content-Type': 'application/json',
+            },
+        });
 
-  return res.json({
-    error: 0,
-    message: "Ok",
-    data: webhookData
-  });
+        if (response.data.code === '00') {
+            // Thành công, trả data cho client
+            res.json({
+                success: true,
+                data: response.data.data,
+            });
+        } else {
+            res.status(400).json({
+                success: false,
+                message: 'Failed to get payment request details',
+                detail: response.data,
+            });
+        }
+    } catch (error) {
+        console.error(error.response?.data || error.message);
+        res.status(500).json({
+            success: false,
+            message: 'Server error',
+            detail: error.response?.data || error.message,
+        });
+    }
 });
 
 module.exports = router;
