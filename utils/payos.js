@@ -7,7 +7,7 @@ const PAYOS_API_KEY = process.env.PAYOS_API_KEY;
 async function createPaymentLink(paymentData) {
   try {
     const response = await axios.post(
-      'https://api.payos.vn/v2/payment-requests',
+      'https://api-merchant.payos.vn/v2/payment-requests',
       paymentData,
       {
         headers: {
