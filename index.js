@@ -32,7 +32,7 @@ app.post('/create-payment-link', async (req, res) => {
       description: `Nâng cấp Premium cho ${userName}`,
       buyerName: userName,
       buyerEmail: userEmail,
-      buyerPhone: "0123456789", // TODO: Replace with real phone if available
+      buyerPhone: "0123456789",
       cancelUrl: `${YOUR_DOMAIN}/cancel.html`,
       returnUrl: `${YOUR_DOMAIN}/success.html`,
     };
@@ -42,13 +42,9 @@ app.post('/create-payment-link', async (req, res) => {
     const paymentLinkResponse = await payOS.createPaymentLink(body);
 
     if (paymentLinkResponse.checkoutUrl) {
-      // Nếu gọi từ Flutter/web frontend:
       return res.status(200).json({
         checkoutUrl: paymentLinkResponse.checkoutUrl
       });
-
-      // Nếu chỉ chạy web, dùng:
-      // res.redirect(paymentLinkResponse.checkoutUrl);
     } else {
       console.error('PayOS did not return checkoutUrl:', paymentLinkResponse);
       res.status(500).json({ error: 'Failed to create payment link', detail: paymentLinkResponse });
@@ -59,6 +55,14 @@ app.post('/create-payment-link', async (req, res) => {
   }
 });
 
+// ✅ Thêm webhook tại đây:
+app.post('/payos-webhook', async (req, res) => {
+  console.log('✅ Received PayOS webhook:', JSON.stringify(req.body, null, 2));
+
+  // TODO: Xử lý webhook để cập nhật trạng thái thanh toán hoặc cấp Premium tại đây.
+
+  res.status(200).json({ message: 'Webhook received successfully' });
+});
 
 app.listen(PORT, () => {
   console.log(`Server is listening on port ${PORT}`);
