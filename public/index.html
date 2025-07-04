@@ -1,21 +1,24 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="vi">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tạo Link thanh toán</title>
+    <title>Tạo Link Thanh Toán PayOS</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="main-box">
         <div class="checkout">
             <div class="product">
-                <p><strong>Tên sản phẩm:</strong> Mì tôm Hảo Hảo ly</p>
-                <p><strong>Giá tiền:</strong> 1000 VNĐ</p>
+                <p><strong>Tên sản phẩm:</strong> Nâng cấp Premium</p>
+                <p><strong>Giá tiền:</strong> 20.000 VNĐ</p>
                 <p><strong>Số lượng:</strong> 1</p>
             </div>
             <form action="/create-payment-link" method="post">
-                <button type="submit" id="create-payment-link-btn">Tạo Link thanh toán</button>
+                <input type="text" name="userId" placeholder="User ID (VD: u123456)" required style="width: 90%; margin: 5px; padding: 8px;">
+                <input type="text" name="userName" placeholder="Tên người dùng (VD: Nguyễn Văn A)" required style="width: 90%; margin: 5px; padding: 8px;">
+                <input type="email" name="userEmail" placeholder="Email (VD: a@example.com)" required style="width: 90%; margin: 5px; padding: 8px;">
+                <button type="submit" id="create-payment-link-btn">Tạo Link Thanh Toán</button>
             </form>
         </div>
     </div>
