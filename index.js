@@ -63,6 +63,10 @@ app.post('/payos-webhook', async (req, res) => {
 
   res.status(200).json({ message: 'Webhook received successfully' });
 });
+app.get('/my-ip', async (req, res) => {
+  const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+  res.send(`Your server public IP might be: ${ip}`);
+});
 
 app.listen(PORT, () => {
   console.log(`Server is listening on port ${PORT}`);
