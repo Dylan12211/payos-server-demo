@@ -27,28 +27,38 @@ app.post('/create-payment-link', async (req, res) => {
     }
 
     const body = {
-      orderCode: `ORDER_${userId}_${Date.now()}`,
+      orderCode: `ORDER_${userId}_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
       amount: 20000,
       description: `Nâng cấp Premium cho ${userName}`,
       buyerName: userName,
       buyerEmail: userEmail,
-      buyerPhone: "0123456789",
+      buyerPhone: "0123456789", // TODO: Replace with real phone if available
       cancelUrl: `${YOUR_DOMAIN}/cancel.html`,
       returnUrl: `${YOUR_DOMAIN}/success.html`,
     };
 
+    console.log('Sending paymentData to PayOS:', JSON.stringify(body, null, 2));
+
     const paymentLinkResponse = await payOS.createPaymentLink(body);
 
     if (paymentLinkResponse.checkoutUrl) {
-      res.redirect(paymentLinkResponse.checkoutUrl);
+      // Nếu gọi từ Flutter/web frontend:
+      return res.status(200).json({
+        checkoutUrl: paymentLinkResponse.checkoutUrl
+      });
+
+      // Nếu chỉ chạy web, dùng:
+      // res.redirect(paymentLinkResponse.checkoutUrl);
     } else {
-      res.status(500).json({ error: 'Failed to create payment link' });
+      console.error('PayOS did not return checkoutUrl:', paymentLinkResponse);
+      res.status(500).json({ error: 'Failed to create payment link', detail: paymentLinkResponse });
     }
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Server error' });
+    console.error('Error creating payment link:', error.response?.data || error.message);
+    res.status(500).json({ error: 'Server error', detail: error.response?.data || error.message });
   }
 });
+
 
 app.listen(PORT, () => {
   console.log(`Server is listening on port ${PORT}`);
