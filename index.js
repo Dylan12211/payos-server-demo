@@ -29,15 +29,16 @@ app.post("/create-payment-link", async (req, res) => {
     }
 
     const paymentData = {
-      orderCode: `ORDER_${userId}_${Date.now()}`,
+      orderCode: Date.now(), // Sử dụng timestamp làm orderCode (number, nhỏ hơn MAX_SAFE_INTEGER)
       amount: 20000,
-      description: `Nâng cấp Premium cho ${userName}`,
+      description: "Nâng cấp Premium", // <= 25 ký tự
       buyerName: userName,
       buyerEmail: userEmail,
       buyerPhone: "0123456789",
       cancelUrl: `${YOUR_DOMAIN}/cancel.html`,
       returnUrl: `${YOUR_DOMAIN}/success.html`,
     };
+
 
     console.log("🚀 Sending paymentData to PayOS:", JSON.stringify(paymentData, null, 2));
 
