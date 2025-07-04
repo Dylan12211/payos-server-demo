@@ -1,40 +1,52 @@
-const express = require('express');
+import express from 'express';
+import { db } from '../firebase-admin.js';
+
 const router = express.Router();
-const admin = require('firebase-admin');
 
-admin.initializeApp({
-  credential: admin.credential.applicationDefault(), // hoặc sử dụng serviceAccountKey nếu cần
-});
-
-const db = admin.firestore();
-
-router.post('/', async (req, res) => {
+router.post('/', express.raw({ type: '*/*' }), async (req, res) => {
   try {
-    const payload = req.body;
-    console.log('✅ PayOS webhook received:', JSON.stringify(payload, null, 2));
+    const signature = req.headers["x-signature"];
+    const rawBody = req.body.toString('utf8');
 
-    // Kiểm tra nếu giao dịch thành công
-    if (payload.status === 'PAID') {
-      const userId = payload.userId; // hoặc payload.buyerEmail nếu không có userId
+    if (req.app.locals.payos.verifyWebhookSignature(rawBody, signature)) {
+      const data = JSON.parse(rawBody);
+      console.log("✅ Webhook verified:", JSON.stringify(data, null, 2));
 
-      if (!userId) {
-        return res.status(400).json({ error: 'Missing userId' });
+      if (data.status === 'PAID') {
+        const orderCode = data.orderCode;
+
+        /**
+         * ✅ Cách đồng bộ userId với orderCode:
+         * Nếu bạn đã embed userId vào orderCode khi tạo payment:
+         * Ví dụ: `orderCode: `${Date.now()}_${userId}`
+         * thì parse lại:
+         */
+
+        const userId = orderCode.split('_')[1];
+
+        if (!userId) {
+          console.error("❌ Không tìm thấy userId trong orderCode.");
+          return res.status(400).json({ error: "Missing userId" });
+        }
+
+        // ✅ Update Firestore
+        await db.collection('users').doc(userId).update({
+          premium: true,
+          premiumActivatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        console.log(`✅ User ${userId} đã được nâng cấp Premium.`);
       }
 
-      // Cập nhật premium = true
-      await db.collection('users').doc(userId).update({
-        premium: true,
-        premiumActivatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
-
-      console.log(`✅ Updated premium for user: ${userId}`);
+      return res.status(200).json({ message: "Webhook received and processed" });
+    } else {
+      console.warn("⚠️ Invalid signature, ignoring webhook");
+      return res.status(400).json({ error: "Invalid signature" });
     }
-
-    res.status(200).json({ message: 'Webhook received and processed.' });
   } catch (error) {
-    console.error('❌ Error processing webhook:', error);
-    res.status(500).json({ error: 'Webhook processing failed.' });
+    console.error("❌ Error processing webhook:", error);
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
-module.exports = router;
+export default router;
