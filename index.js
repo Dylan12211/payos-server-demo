@@ -18,12 +18,10 @@ const payos = new PayOS(
   process.env.PAYOS_CHECKSUM_KEY
 );
 
-// ✅ Khởi tạo Firebase Admin
+// ✅ Khởi tạo Firebase Admin sử dụng biến môi trường GOOGLE_APPLICATION_CREDENTIALS_JSON
 if (!admin.apps.length) {
   admin.initializeApp({
-    credential: admin.credential.cert(
-      JSON.parse(readFileSync('./serviceAccountKey.json', 'utf8'))
-    ),
+    credential: admin.credential.cert(JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON))
   });
 }
 const db = admin.firestore();
