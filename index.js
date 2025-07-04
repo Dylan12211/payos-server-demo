@@ -16,6 +16,7 @@ app.use(express.urlencoded({ extended: false }));
 app.use('/', express.static('public'));
 app.use('/payment', require('./controllers/payment-controller'));
 app.use('/order', require('./controllers/order-controller'));
+app.use('/payment-request', require('./controllers/payment-request-controller'));
 
 app.post('/create-payment-link', async (req, res) => {
   try {
