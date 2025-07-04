@@ -42,10 +42,12 @@ app.post("/create-payment-link", async (req, res) => {
       return res.status(400).json({ error: "Thiếu thông tin cần thiết." });
     }
 
+    const orderCode = Date.now() % 1000000; // ✅ 6 số cuối timestamp, tránh vượt MAX_SAFE_INTEGER
+
     const paymentData = {
-      orderCode: `${Date.now()}_${userId}`, // ✅ Embed userId để parse lại sau
+      orderCode: orderCode,
       amount: 20000,
-      description: "Nâng cấp Premium", // <= 25 ký tự
+      description: "Nang cap Premium", // <= 25 ký tự
       buyerName: userName,
       buyerEmail: userEmail,
       buyerPhone: "0123456789",
@@ -56,6 +58,14 @@ app.post("/create-payment-link", async (req, res) => {
     console.log("🚀 Sending paymentData to PayOS:", JSON.stringify(paymentData, null, 2));
 
     const paymentLink = await payos.createPaymentLink(paymentData);
+
+    // ✅ Lưu mapping orderCode ↔ userId để webhook tra ngược
+    await db.collection('payos_payments').doc(orderCode.toString()).set({
+      userId: userId,
+      status: 'PENDING',
+      amount: 20000,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
 
     console.log("✅ checkoutUrl:", paymentLink.checkoutUrl);
 
@@ -80,18 +90,28 @@ app.post("/payos-webhook", express.raw({ type: "*/*" }), async (req, res) => {
       console.log("✅ Webhook received & verified:", JSON.stringify(data, null, 2));
 
       if (data.status === 'PAID') {
-        const orderCode = data.orderCode; // vd: '1712345678901_userId'
-        const userId = orderCode.split('_')[1]; // ✅ parse userId
+        const orderCode = data.orderCode.toString();
 
-        if (!userId) {
-          console.error("❌ Không tìm thấy userId trong orderCode.");
-          return res.status(400).json({ error: "Missing userId in orderCode" });
+        // ✅ Lấy userId từ Firestore mapping
+        const paymentDoc = await db.collection('payos_payments').doc(orderCode).get();
+
+        if (!paymentDoc.exists) {
+          console.error("❌ Không tìm thấy orderCode trong Firestore:", orderCode);
+          return res.status(400).json({ error: "OrderCode not found" });
         }
 
-        // ✅ Cập nhật Firestore: nâng cấp Premium
+        const userId = paymentDoc.data().userId;
+
+        // ✅ Cập nhật user Premium
         await db.collection('users').doc(userId).update({
           premium: true,
           premiumActivatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        // ✅ Update trạng thái thanh toán
+        await db.collection('payos_payments').doc(orderCode).update({
+          status: 'PAID',
+          paidAt: admin.firestore.FieldValue.serverTimestamp(),
         });
 
         console.log(`✅ User ${userId} đã được nâng cấp Premium.`);
