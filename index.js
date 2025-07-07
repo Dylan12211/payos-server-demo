@@ -3,7 +3,6 @@ import dotenv from "dotenv";
 import cors from "cors";
 import PayOS from "@payos/node";
 import admin from "firebase-admin";
-import { readFileSync } from "fs";
 
 dotenv.config();
 
@@ -40,12 +39,12 @@ app.post("/create-payment-link", async (req, res) => {
       return res.status(400).json({ error: "Thiếu thông tin cần thiết." });
     }
 
-    const orderCode = Date.now() % 1000000; // ✅ 6 số cuối timestamp, tránh vượt MAX_SAFE_INTEGER
+    const orderCode = Date.now() % 1000000;
 
     const paymentData = {
       orderCode: orderCode,
       amount: 20000,
-      description: "Nang cap Premium", // <= 25 ký tự
+      description: "Nang cap Premium",
       buyerName: userName,
       buyerEmail: userEmail,
       buyerPhone: "0123456789",
@@ -57,7 +56,6 @@ app.post("/create-payment-link", async (req, res) => {
 
     const paymentLink = await payos.createPaymentLink(paymentData);
 
-    // ✅ Lưu mapping orderCode ↔ userId để webhook tra ngược
     await db.collection('payos_payments').doc(orderCode.toString()).set({
       userId: userId,
       status: 'PENDING',
@@ -78,51 +76,39 @@ app.post("/create-payment-link", async (req, res) => {
 });
 
 // ✅ Webhook nhận callback từ PayOS
-app.post("/payos-webhook", express.raw({ type: "*/*" }), async (req, res) => {
+app.post("/payos-webhook", async (req, res) => {
   try {
-    const signature = req.headers["x-signature"];
-    const rawBody = req.body;
+    const data = payos.verifyPaymentWebhookData(req.body);
+    console.log("✅ Webhook verified data:", JSON.stringify(data, null, 2));
 
-    if (payos.verifyWebhookData(rawBody, signature)) {
-      const data = JSON.parse(rawBody.toString('utf8'));
-      console.log("✅ Webhook received & verified:", JSON.stringify(data, null, 2));
+    if (data.code === "00") {
+      const orderCode = data.data.orderCode.toString();
 
-      if (data.status === 'PAID') {
-        const orderCode = data.orderCode.toString();
-
-        // ✅ Lấy userId từ Firestore mapping
-        const paymentDoc = await db.collection('payos_payments').doc(orderCode).get();
-
-        if (!paymentDoc.exists) {
-          console.error("❌ Không tìm thấy orderCode trong Firestore:", orderCode);
-          return res.status(400).json({ error: "OrderCode not found" });
-        }
-
-        const userId = paymentDoc.data().userId;
-
-        // ✅ Cập nhật user Premium
-        await db.collection('users').doc(userId).update({
-          premium: true,
-          premiumActivatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
-
-        // ✅ Update trạng thái thanh toán
-        await db.collection('payos_payments').doc(orderCode).update({
-          status: 'PAID',
-          paidAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
-
-        console.log(`✅ User ${userId} đã được nâng cấp Premium.`);
+      const paymentDoc = await db.collection('payos_payments').doc(orderCode).get();
+      if (!paymentDoc.exists) {
+        console.error(`❌ Không tìm thấy orderCode ${orderCode} trong Firestore`);
+        return res.status(400).json({ error: "OrderCode not found" });
       }
 
-      return res.status(200).json({ message: "Webhook received and processed" });
-    } else {
-      console.warn("⚠️ Invalid signature, ignoring webhook");
-      return res.status(400).json({ error: "Invalid signature" });
+      const userId = paymentDoc.data().userId;
+
+      await db.collection('users').doc(userId).update({
+        premium: true,
+        premiumActivatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      await db.collection('payos_payments').doc(orderCode).update({
+        status: 'PAID',
+        paidAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      console.log(`✅ User ${userId} đã được nâng cấp Premium.`);
     }
+
+    return res.status(200).json({ message: "Webhook processed successfully" });
   } catch (error) {
     console.error("❌ Error processing webhook:", error);
-    return res.status(500).json({ error: "Server error" });
+    return res.status(400).json({ error: "Invalid signature or payload" });
   }
 });
 
