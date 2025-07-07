@@ -83,7 +83,7 @@ app.post("/payos-webhook", express.raw({ type: "*/*" }), async (req, res) => {
     const signature = req.headers["x-signature"];
     const rawBody = req.body;
 
-    if (payos.verifyWebhookSignature(rawBody, signature)) {
+    if (payos.verifyWebhookData(rawBody, signature)) {
       const data = JSON.parse(rawBody.toString('utf8'));
       console.log("✅ Webhook received & verified:", JSON.stringify(data, null, 2));
 
