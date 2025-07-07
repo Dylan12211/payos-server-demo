@@ -78,18 +78,7 @@ app.post("/create-payment-link", async (req, res) => {
 // ✅ Webhook nhận callback từ PayOS
 app.post("/payos-webhook", express.raw({ type: "*/*" }), async (req, res) => {
   try {
-    const signature = req.headers["x-signature"];
-    const rawBody = req.body;
-
-    // ✅ Verify chữ ký
-    const isValid = payos.verifyWebhookSignature(rawBody, signature);
-    if (!isValid) {
-      console.warn("⚠️ Invalid signature, ignoring webhook");
-      return res.status(400).json({ error: "Invalid signature" });
-    }
-
-    // ✅ Parse payload
-    const payload = JSON.parse(rawBody.toString('utf8'));
+    const payload = payos.verifyPaymentWebhookData(req.body);
     console.log("✅ Webhook verified payload:", JSON.stringify(payload, null, 2));
 
     if (payload.code === "00" && payload.data.status === "PAID") {
