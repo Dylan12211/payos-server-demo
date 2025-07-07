@@ -76,13 +76,24 @@ app.post("/create-payment-link", async (req, res) => {
 });
 
 // ✅ Webhook nhận callback từ PayOS
-app.post("/payos-webhook", async (req, res) => {
+app.post("/payos-webhook", express.raw({ type: "*/*" }), async (req, res) => {
   try {
-    const data = payos.verifyPaymentWebhookData(req.body);
-    console.log("✅ Webhook verified data:", JSON.stringify(data, null, 2));
+    const signature = req.headers["x-signature"];
+    const rawBody = req.body;
 
-    if (data.code === "00") {
-      const orderCode = data.data.orderCode.toString();
+    // ✅ Verify chữ ký
+    const isValid = payos.verifyWebhookSignature(rawBody, signature);
+    if (!isValid) {
+      console.warn("⚠️ Invalid signature, ignoring webhook");
+      return res.status(400).json({ error: "Invalid signature" });
+    }
+
+    // ✅ Parse payload
+    const payload = JSON.parse(rawBody.toString('utf8'));
+    console.log("✅ Webhook verified payload:", JSON.stringify(payload, null, 2));
+
+    if (payload.code === "00" && payload.data.status === "PAID") {
+      const orderCode = payload.data.orderCode.toString();
 
       const paymentDoc = await db.collection('payos_payments').doc(orderCode).get();
       if (!paymentDoc.exists) {
@@ -108,9 +119,10 @@ app.post("/payos-webhook", async (req, res) => {
     return res.status(200).json({ message: "Webhook processed successfully" });
   } catch (error) {
     console.error("❌ Error processing webhook:", error);
-    return res.status(400).json({ error: "Invalid signature or payload" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
+
 
 // ✅ Khởi chạy server
 app.listen(PORT, () => {
