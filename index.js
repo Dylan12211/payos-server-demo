@@ -76,6 +76,7 @@ app.post("/create-payment-link", async (req, res) => {
 });
 
 // ✅ Webhook nhận callback từ PayOS
+// ✅ Webhook nhận callback từ PayOS
 app.post("/payos-webhook", express.raw({ type: "*/*" }), async (req, res) => {
   try {
     const payload = payos.verifyPaymentWebhookData(req.body);
@@ -92,17 +93,25 @@ app.post("/payos-webhook", express.raw({ type: "*/*" }), async (req, res) => {
 
       const userId = paymentDoc.data().userId;
 
+      // ✅ Tính ngày hết hạn (sau 1 tháng)
+      const now = new Date();
+      const expiredDate = new Date();
+      expiredDate.setMonth(now.getMonth() + 1);
+
+      // ✅ Cập nhật user thành Premium
       await db.collection('users').doc(userId).update({
         premium: true,
         premiumActivatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        premiumExpiredAt: expiredDate, // Thêm ngày hết hạn
       });
 
+      // ✅ Cập nhật bảng thanh toán
       await db.collection('payos_payments').doc(orderCode).update({
-        status: 'SUCCESS', // hoặc 'PAID' nếu bạn muốn giữ nguyên tên
+        status: 'SUCCESS',
         paidAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
-      console.log(`✅ User ${userId} đã được nâng cấp Premium.`);
+      console.log(`✅ User ${userId} đã được nâng cấp Premium. Hết hạn vào: ${expiredDate}`);
     }
 
     return res.status(200).json({ message: "Webhook processed successfully" });
@@ -111,6 +120,7 @@ app.post("/payos-webhook", express.raw({ type: "*/*" }), async (req, res) => {
     return res.status(500).json({ error: "Server error" });
   }
 });
+
 
 
 
