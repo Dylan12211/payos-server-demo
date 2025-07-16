@@ -109,6 +109,7 @@ app.post("/payos-webhook", express.raw({ type: "*/*" }), async (req, res) => {
       await db.collection('payos_payments').doc(orderCode).update({
         status: 'SUCCESS',
         paidAt: admin.firestore.FieldValue.serverTimestamp(),
+        endAt: expiredDate,
       });
 
       console.log(`✅ User ${userId} đã được nâng cấp Premium. Hết hạn vào: ${expiredDate}`);
