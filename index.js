@@ -81,8 +81,8 @@ app.post("/payos-webhook", express.raw({ type: "*/*" }), async (req, res) => {
     const payload = payos.verifyPaymentWebhookData(req.body);
     console.log("✅ Webhook verified payload:", JSON.stringify(payload, null, 2));
 
-    if (payload.code === "00" && payload.data.status === "PAID") {
-      const orderCode = payload.data.orderCode.toString();
+    if (payload.code === "00" && payload.desc === "success") {
+      const orderCode = payload.orderCode.toString();
 
       const paymentDoc = await db.collection('payos_payments').doc(orderCode).get();
       if (!paymentDoc.exists) {
@@ -98,7 +98,7 @@ app.post("/payos-webhook", express.raw({ type: "*/*" }), async (req, res) => {
       });
 
       await db.collection('payos_payments').doc(orderCode).update({
-        status: 'PAID',
+        status: 'SUCCESS', // hoặc 'PAID' nếu bạn muốn giữ nguyên tên
         paidAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
@@ -111,6 +111,7 @@ app.post("/payos-webhook", express.raw({ type: "*/*" }), async (req, res) => {
     return res.status(500).json({ error: "Server error" });
   }
 });
+
 
 
 // ✅ Khởi chạy server
