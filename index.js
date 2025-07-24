@@ -44,7 +44,7 @@ app.post("/create-payment-link", async (req, res) => {
     const paymentData = {
       orderCode: orderCode,
       amount: 20000,
-      description: "Nang cap Premium",
+      description: "Nâng cấp Premium",
       buyerName: userName,
       buyerEmail: userEmail,
       buyerPhone: "0123456789",
@@ -56,15 +56,7 @@ app.post("/create-payment-link", async (req, res) => {
 
     const paymentLink = await payos.createPaymentLink(paymentData);
 
-    await db.collection('payos_payments').doc(orderCode.toString()).set({
-      userId: userId,
-      status: 'PENDING',
-      amount: 20000,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
-
-    console.log("✅ checkoutUrl:", paymentLink.checkoutUrl);
-
+    // ❌ KHÔNG LƯU FIRESTORE Ở ĐÂY
     return res.status(200).json({ checkoutUrl: paymentLink.checkoutUrl });
   } catch (error) {
     console.error("❌ Error creating payment link:", error.response?.data || error.message);
@@ -75,7 +67,7 @@ app.post("/create-payment-link", async (req, res) => {
   }
 });
 
-// ✅ Webhook nhận callback từ PayOS
+
 // ✅ Webhook nhận callback từ PayOS
 app.post("/payos-webhook", express.raw({ type: "*/*" }), async (req, res) => {
   try {
@@ -84,35 +76,48 @@ app.post("/payos-webhook", express.raw({ type: "*/*" }), async (req, res) => {
 
     if (payload.code === "00" && payload.desc === "success") {
       const orderCode = payload.orderCode.toString();
+      const userEmail = payload.buyerEmail;
+      const userName = payload.buyerName;
+      const buyerPhone = payload.buyerPhone;
 
-      const paymentDoc = await db.collection('payos_payments').doc(orderCode).get();
-      if (!paymentDoc.exists) {
-        console.error(`❌ Không tìm thấy orderCode ${orderCode} trong Firestore`);
-        return res.status(400).json({ error: "OrderCode not found" });
+      // 🔍 Tìm userId dựa theo user_name = email
+      const userSnapshot = await db.collection('users')
+        .where('user_name', '==', userEmail)
+        .limit(1)
+        .get();
+
+      if (userSnapshot.empty) {
+        console.error("❌ Không tìm thấy người dùng với email:", userEmail);
+        return res.status(404).json({ error: "User not found" });
       }
 
-      const userId = paymentDoc.data().userId;
+      const userDoc = userSnapshot.docs[0];
+      const userId = userDoc.id;
 
-      // ✅ Tính ngày hết hạn (sau 1 tháng)
       const now = new Date();
       const expiredDate = new Date();
       expiredDate.setMonth(now.getMonth() + 1);
 
-      // ✅ Cập nhật user thành Premium
+      // ✅ Cập nhật thông tin Premium cho user
       await db.collection('users').doc(userId).update({
         premium: true,
         premiumActivatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        premiumExpiredAt: expiredDate, // Thêm ngày hết hạn
+        premiumExpiredAt: expiredDate,
       });
 
-      // ✅ Cập nhật bảng thanh toán
-      await db.collection('payos_payments').doc(orderCode).update({
+      // ✅ Lưu giao dịch vào bảng payos_payments
+      await db.collection('payos_payments').doc(orderCode).set({
+        userId: userId,
         status: 'SUCCESS',
+        amount: payload.amount,
         paidAt: admin.firestore.FieldValue.serverTimestamp(),
         endAt: expiredDate,
+        buyerEmail,
+        buyerName,
+        buyerPhone,
       });
 
-      console.log(`✅ User ${userId} đã được nâng cấp Premium. Hết hạn vào: ${expiredDate}`);
+      console.log(`✅ Nâng cấp Premium thành công cho user ${userId} (${userEmail})`);
     }
 
     return res.status(200).json({ message: "Webhook processed successfully" });
@@ -121,6 +126,8 @@ app.post("/payos-webhook", express.raw({ type: "*/*" }), async (req, res) => {
     return res.status(500).json({ error: "Server error" });
   }
 });
+
+
 
 
 
